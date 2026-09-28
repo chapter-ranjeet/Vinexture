@@ -24,7 +24,8 @@ import {
   X,
 } from "lucide-react";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { fetchJson, getPdfUrl, downloadPdfFile } from "@/lib/api";
+import { fetchJson, getPdfUrl, downloadPdfFile, getApiUrl } from "@/lib/api";
+import { getAuthTokens } from "@/lib/auth";
 
 type Offer = {
   id: number;
@@ -117,6 +118,58 @@ export default function AdminOffersPage() {
       setDownloadingId(null);
     }
   }
+
+  const [previewPdfBlobUrl, setPreviewPdfBlobUrl] = useState<string | null>(null);
+  const [previewPdfLoading, setPreviewPdfLoading] = useState(false);
+  const [previewPdfError, setPreviewPdfError] = useState("");
+
+  useEffect(() => {
+    if (!previewOffer) {
+      if (previewPdfBlobUrl) {
+        URL.revokeObjectURL(previewPdfBlobUrl);
+      }
+      setPreviewPdfBlobUrl(null);
+      setPreviewPdfError("");
+      return;
+    }
+
+    let isMounted = true;
+    setPreviewPdfLoading(true);
+    setPreviewPdfError("");
+
+    async function loadPdf() {
+      try {
+        const url = getApiUrl(`admin/offers/${previewOffer!.id}/pdf/`);
+        const tokens = getAuthTokens();
+        const headers = new Headers();
+        if (tokens?.access) headers.set("Authorization", `Bearer ${tokens.access}`);
+
+        const response = await fetch(url, { headers });
+        if (!response.ok) {
+          throw new Error(`Server returned HTTP ${response.status} while loading PDF.`);
+        }
+        const blob = await response.blob();
+        if (isMounted) {
+          const blobUrl = URL.createObjectURL(blob);
+          setPreviewPdfBlobUrl(blobUrl);
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          setPreviewPdfError(err instanceof Error ? err.message : "Failed to load offer letter preview.");
+        }
+      } finally {
+        if (isMounted) {
+          setPreviewPdfLoading(false);
+        }
+      }
+    }
+
+    loadPdf();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [previewOffer]);
 
   // Load offer letters
   async function loadOffers() {
@@ -880,12 +933,41 @@ export default function AdminOffersPage() {
               </div>
 
               {/* Embedded PDF Viewer or iframe */}
-              <div className="flex-1 p-4 bg-slate-100 min-h-[500px]">
-                <iframe
-                  src={getPdfUrl(`admin/offers/${previewOffer.id}/pdf/#toolbar=1`)}
-                  className="w-full h-full min-h-[500px] rounded-xl border border-slate-300 bg-white"
-                  title="Offer Letter PDF"
-                />
+              <div className="flex-1 p-4 bg-slate-100 min-h-[520px] flex flex-col justify-center items-center">
+                {previewPdfLoading ? (
+                  <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+                    <RefreshCw className="h-9 w-9 animate-spin text-blue-600" />
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">Generating & Loading Offer Letter...</p>
+                      <p className="text-xs text-slate-500 mt-1">Populating official VINEXTURE letterhead, seal, and QR verification</p>
+                    </div>
+                  </div>
+                ) : previewPdfError ? (
+                  <div className="flex flex-col items-center justify-center gap-3 p-8 text-center max-w-md">
+                    <AlertCircle className="h-10 w-10 text-rose-500" />
+                    <p className="text-sm font-bold text-slate-900">Could not render preview</p>
+                    <p className="text-xs text-rose-600">{previewPdfError}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleDownload(previewOffer)}
+                      className="mt-2 inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2.5 text-xs font-semibold text-white shadow hover:bg-slate-800"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Download PDF Instead
+                    </button>
+                  </div>
+                ) : previewPdfBlobUrl ? (
+                  <object
+                    data={`${previewPdfBlobUrl}#toolbar=1`}
+                    type="application/pdf"
+                    className="w-full h-full min-h-[520px] rounded-xl border border-slate-300 bg-white"
+                  >
+                    <iframe
+                      src={`${previewPdfBlobUrl}#toolbar=1`}
+                      className="w-full h-full min-h-[520px] rounded-xl border border-slate-300 bg-white"
+                      title="Offer Letter PDF"
+                    />
+                  </object>
+                ) : null}
               </div>
 
               {/* Footer info */}

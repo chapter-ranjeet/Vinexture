@@ -187,6 +187,11 @@ class AdminOfferRevokeView(APIView):
         return Response(serializer.data)
 
 
+from django.views.decorators.clickjacking import xframe_options_exempt
+from django.utils.decorators import method_decorator
+
+
+@method_decorator(xframe_options_exempt, name='dispatch')
 class OfferPdfDownloadView(APIView):
     """
     Serves the offer letter PDF for admin or the authorized candidate.
@@ -241,6 +246,9 @@ class OfferPdfDownloadView(APIView):
         response = FileResponse(file_stream, content_type='application/pdf')
         filename = f"VINEXTURE_Offer_Letter_{offer.offer_letter_number}.pdf"
         response['Content-Disposition'] = f'inline; filename="{filename}"'
+        response['X-Frame-Options'] = 'ALLOWALL'
+        response['Content-Security-Policy'] = "frame-ancestors *"
+        response['Access-Control-Allow-Origin'] = '*'
         return response
 
 

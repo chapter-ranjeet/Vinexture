@@ -47,7 +47,7 @@ function GithubIcon({ className = "h-4 w-4" }: { className?: string }) {
 
 import { ProtectedRoute } from "@/components/protected-route";
 import { Button } from "@/components/ui/button";
-import { fetchJson, getPdfUrl, downloadPdfFile } from "@/lib/api";
+import { fetchJson, getPdfUrl, downloadPdfFile, getApiUrl } from "@/lib/api";
 import { clearAuthTokens, getAuthTokens, getUserFromAccessToken } from "@/lib/auth";
 
 type Profile = {
@@ -241,6 +241,58 @@ export default function PortalPage() {
       setDownloadingOfferId(null);
     }
   }
+
+  const [candidatePdfBlobUrl, setCandidatePdfBlobUrl] = useState<string | null>(null);
+  const [candidatePdfLoading, setCandidatePdfLoading] = useState(false);
+  const [candidatePdfError, setCandidatePdfError] = useState("");
+
+  useEffect(() => {
+    if (!previewOfferModal) {
+      if (candidatePdfBlobUrl) {
+        URL.revokeObjectURL(candidatePdfBlobUrl);
+      }
+      setCandidatePdfBlobUrl(null);
+      setCandidatePdfError("");
+      return;
+    }
+
+    let isMounted = true;
+    setCandidatePdfLoading(true);
+    setCandidatePdfError("");
+
+    async function loadPdf() {
+      try {
+        const url = getApiUrl(`offers/${previewOfferModal!.id}/pdf/`);
+        const tokens = getAuthTokens();
+        const headers = new Headers();
+        if (tokens?.access) headers.set("Authorization", `Bearer ${tokens.access}`);
+
+        const response = await fetch(url, { headers });
+        if (!response.ok) {
+          throw new Error(`Server returned HTTP ${response.status} while loading PDF.`);
+        }
+        const blob = await response.blob();
+        if (isMounted) {
+          const blobUrl = URL.createObjectURL(blob);
+          setCandidatePdfBlobUrl(blobUrl);
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          setCandidatePdfError(err instanceof Error ? err.message : "Failed to load offer letter preview.");
+        }
+      } finally {
+        if (isMounted) {
+          setCandidatePdfLoading(false);
+        }
+      }
+    }
+
+    loadPdf();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [previewOfferModal]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -1654,12 +1706,41 @@ export default function PortalPage() {
                 </div>
               </div>
 
-              <div className="flex-1 p-4 bg-slate-100 min-h-[500px]">
-                <iframe
-                  src={getPdfUrl(`offers/${previewOfferModal.id}/pdf/#toolbar=1`)}
-                  className="w-full h-full min-h-[500px] rounded-xl border border-slate-300 bg-white"
-                  title="Offer Letter Preview"
-                />
+              <div className="flex-1 p-4 bg-slate-100 min-h-[520px] flex flex-col justify-center items-center">
+                {candidatePdfLoading ? (
+                  <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+                    <Clock className="h-9 w-9 animate-spin text-blue-600" />
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">Loading Official Offer Letter...</p>
+                      <p className="text-xs text-slate-500 mt-1">Preparing single-page PDF with QR verification</p>
+                    </div>
+                  </div>
+                ) : candidatePdfError ? (
+                  <div className="flex flex-col items-center justify-center gap-3 p-8 text-center max-w-md">
+                    <AlertCircle className="h-10 w-10 text-rose-500" />
+                    <p className="text-sm font-bold text-slate-900">Could not render preview</p>
+                    <p className="text-xs text-rose-600">{candidatePdfError}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadOffer(previewOfferModal)}
+                      className="mt-2 inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2.5 text-xs font-semibold text-white shadow hover:bg-slate-800"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Download PDF Instead
+                    </button>
+                  </div>
+                ) : candidatePdfBlobUrl ? (
+                  <object
+                    data={`${candidatePdfBlobUrl}#toolbar=1`}
+                    type="application/pdf"
+                    className="w-full h-full min-h-[520px] rounded-xl border border-slate-300 bg-white"
+                  >
+                    <iframe
+                      src={`${candidatePdfBlobUrl}#toolbar=1`}
+                      className="w-full h-full min-h-[520px] rounded-xl border border-slate-300 bg-white"
+                      title="Offer Letter Preview"
+                    />
+                  </object>
+                ) : null}
               </div>
 
               <div className="border-t border-slate-200 px-6 py-3 bg-slate-50 flex items-center justify-between text-xs text-slate-600">
