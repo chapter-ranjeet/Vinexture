@@ -1,13 +1,16 @@
 import { clearAuthTokens, getAuthTokens, isAccessTokenExpired, saveAuthTokens } from "@/lib/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api").replace(/\/+$/, "");
 let refreshRequest: Promise<string | null> | null = null;
 
-function getApiUrl(path: string) {
-  if (!API_BASE_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL is not configured");
-  }
+export function getApiUrl(path: string) {
   return `${API_BASE_URL}/${path.replace(/^\/+/, "")}`;
+}
+
+export function getPdfUrl(path: string): string {
+  const tokens = getAuthTokens();
+  const tokenParam = tokens?.access ? `?token=${encodeURIComponent(tokens.access)}` : "";
+  return `${API_BASE_URL}/${path.replace(/^\/+/, "")}${tokenParam}`;
 }
 
 async function refreshAccessToken() {
@@ -114,5 +117,31 @@ export async function uploadFormData<T>(path: string, formData: FormData, method
 
 export async function getApiEndpoint(path: string) {
   return getApiUrl(path);
+}
+
+export async function downloadPdfFile(path: string, defaultFilename: string = "VINEXTURE_Offer_Letter.pdf") {
+  let tokens = getAuthTokens();
+  if (tokens && isAccessTokenExpired(tokens.access)) {
+    const access = await refreshAccessToken();
+    tokens = access ? getAuthTokens() : null;
+  }
+  const headers = new Headers();
+  if (tokens?.access) {
+    headers.set("Authorization", `Bearer ${tokens.access}`);
+  }
+
+  const res = await fetch(getApiUrl(path), { headers });
+  if (!res.ok) {
+    throw new Error(`Failed to download PDF (HTTP ${res.status})`);
+  }
+  const blob = await res.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = blobUrl;
+  anchor.download = defaultFilename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
 }
 

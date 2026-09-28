@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { fetchJson } from "@/lib/api";
+import { fetchJson, getPdfUrl, downloadPdfFile } from "@/lib/api";
 
 type Offer = {
   id: number;
@@ -102,6 +102,21 @@ export default function AdminOffersPage() {
   const [genStartDate, setGenStartDate] = useState("");
   const [genEndDate, setGenEndDate] = useState("");
   const [genIssueImmediately, setGenIssueImmediately] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
+
+  async function handleDownload(offer: Offer) {
+    try {
+      setDownloadingId(offer.id);
+      await downloadPdfFile(
+        `admin/offers/${offer.id}/pdf/`,
+        `VINEXTURE_Offer_Letter_${offer.offer_letter_number || offer.id}.pdf`
+      );
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to download offer letter PDF.");
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   // Load offer letters
   async function loadOffers() {
@@ -547,15 +562,19 @@ export default function AdminOffersPage() {
                             </button>
 
                             {/* Download PDF */}
-                            <a
-                              href={`http://localhost:8000/api/admin/offers/${offer.id}/pdf/`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50"
+                            <button
+                              type="button"
+                              onClick={() => handleDownload(offer)}
+                              disabled={downloadingId === offer.id}
+                              className="rounded-lg p-1.5 text-blue-600 hover:bg-blue-50 disabled:opacity-50 transition"
                               title="Download Single-page A4 PDF"
                             >
-                              <Download className="h-4 w-4" />
-                            </a>
+                              {downloadingId === offer.id ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Download className="h-4 w-4" />
+                              )}
+                            </button>
 
                             {/* Verify QR / Public Verification page */}
                             <Link
@@ -835,14 +854,22 @@ export default function AdminOffersPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a
-                    href={`http://localhost:8000/api/admin/offers/${previewOffer.id}/pdf/`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-slate-800"
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(previewOffer)}
+                    disabled={downloadingId === previewOffer.id}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-slate-800 disabled:opacity-50 transition"
                   >
-                    <Download className="h-3.5 w-3.5" /> Download A4 PDF
-                  </a>
+                    {downloadingId === previewOffer.id ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Downloading...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-3.5 w-3.5" /> Download A4 PDF
+                      </>
+                    )}
+                  </button>
                   <button
                     onClick={() => setPreviewOffer(null)}
                     className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
@@ -855,7 +882,7 @@ export default function AdminOffersPage() {
               {/* Embedded PDF Viewer or iframe */}
               <div className="flex-1 p-4 bg-slate-100 min-h-[500px]">
                 <iframe
-                  src={`http://localhost:8000/api/admin/offers/${previewOffer.id}/pdf/#toolbar=1`}
+                  src={getPdfUrl(`admin/offers/${previewOffer.id}/pdf/#toolbar=1`)}
                   className="w-full h-full min-h-[500px] rounded-xl border border-slate-300 bg-white"
                   title="Offer Letter PDF"
                 />

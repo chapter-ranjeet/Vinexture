@@ -190,27 +190,55 @@ class AdminOfferRevokeView(APIView):
 class OfferPdfDownloadView(APIView):
     """
     Serves the offer letter PDF for admin or the authorized candidate.
+    Supports Authorization header, query parameter ?token=<jwt>, and both local/Cloudinary storage.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get(self, request, pk):
+        user = request.user
+        if not user or not user.is_authenticated:
+            token = request.query_params.get('token')
+            if token:
+                from rest_framework_simplejwt.authentication import JWTAuthentication
+                try:
+                    jwt_auth = JWTAuthentication()
+                    validated_token = jwt_auth.get_validated_token(token)
+                    user = jwt_auth.get_user(validated_token)
+                except Exception:
+                    pass
+
+        if not user or not user.is_authenticated:
+            return Response({'error': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
+
         try:
             offer = Offer.objects.select_related('application__user').get(pk=pk)
         except Offer.DoesNotExist:
             raise Http404("Offer not found")
 
         # Check permissions: Admin or candidate owner
-        if not (request.user.is_staff or offer.application.user_id == request.user.id):
+        is_admin_user = bool(user.is_staff or getattr(user, 'role', '') == 'admin' or user.is_superuser)
+        if not (is_admin_user or offer.application.user_id == user.id):
             return Response({'error': 'You do not have permission to access this offer letter.'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Ensure PDF exists
-        if not offer.pdf_file or not os.path.exists(offer.pdf_file.path):
+        from io import BytesIO
+        file_stream = None
+
+        if offer.pdf_file:
             try:
-                offer.generate_pdf(force=True)
+                # Open stream from file storage (compatible with local FileSystemStorage and Cloudinary)
+                file_stream = offer.pdf_file.open('rb')
+            except Exception:
+                file_stream = None
+
+        if not file_stream:
+            try:
+                from .pdf_generator import generate_offer_letter_pdf
+                pdf_bytes = generate_offer_letter_pdf(offer)
+                file_stream = BytesIO(pdf_bytes)
             except Exception as e:
                 return Response({'error': f'Failed to generate PDF: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        response = FileResponse(open(offer.pdf_file.path, 'rb'), content_type='application/pdf')
+        response = FileResponse(file_stream, content_type='application/pdf')
         filename = f"VINEXTURE_Offer_Letter_{offer.offer_letter_number}.pdf"
         response['Content-Disposition'] = f'inline; filename="{filename}"'
         return response
