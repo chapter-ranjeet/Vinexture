@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569;
+  --border: rgba(15, 23, 42, 0.08);
+  --card: rgba(255, 255, 255, 0.92);
+  --card-strong: #ffffff;
+  --primary: #0f172a;
+  --primary-soft: #e2e8f0;
+  --accent: #2563eb;
+  --accent-soft: #dbeafe;
+  --success: #0f766e;
+  --warning: #f59e0b;
+  --shadow-soft: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.05), transparent 35%),
+    #f8fafc;
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.18);
+}
+
+.container-shell {
+  width: 100%;
+  max-width: 100%;
+  padding-inline: 1.25rem;
+  margin-inline: auto;
+}
+
+@media (min-width: 640px) {
+  .container-shell {
+    padding-inline: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-shell {
+    padding-inline: 3rem;
+  }
+}
+
+@media (min-width: 1440px) {
+  .container-shell {
+    padding-inline: 4rem;
+  }
+}
+
+.grid-glow {
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.soft-card {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-soft);
+}

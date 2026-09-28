@@ -1,0 +1,38 @@
+--- TABLE START ---
+  ROW: 🌐  www.vinexture.com ✉   hello@vinexture.com 📍  Global Remote Team
+--- TABLE END ---
+P [align=left, drawing=True]: 
+P [align=left, drawing=False]: VINEXTURE
+P [align=left, drawing=False]: TECHNOLOGY • DIGITAL SOLUTIONS • TALENT
+P [align=left, drawing=False]: 
+P [align=center, drawing=False]: OFFICIAL OFFER LETTER
+--- TABLE START ---
+  ROW: Issue Date:   [acceptance date]
+--- TABLE END ---
+P [align=center, drawing=True]: I N T E R N S H I P   P R O G R A M
+--- TABLE START ---
+  ROW: Offer Letter No.:   [letter number]
+--- TABLE END ---
+P [align=left, drawing=False]: 
+P [align=left, drawing=False]: 
+--- TABLE START ---
+  ROW: [QR Code for Verification]
+--- TABLE END ---
+P [align=left, drawing=False]: To,
+P [align=left, drawing=False]: [candidate’s name]
+P [align=left, drawing=False]: [candidate’s email]
+P [align=left, drawing=False]: Subject: Offer for [Internship Program Name]
+P [align=left, drawing=False]: Dear [candidate’s name],
+P [align=left, drawing=False]: We are pleased to offer you an internship position as a [Internship program] Intern at VINEXTURE.
+P [align=left, drawing=False]: Based on your application and evaluation, we are offering you the opportunity to join our team and gain practical experience through project-based learning and professional development.
+P [align=left, drawing=False]: Internship Details
+P [align=left, drawing=False]: Position: [internship program] InternDuration: [internship durationMode: RemoteStart Date: [start date]End Date: [end date]Stipend: Unpaid
+P [align=left, drawing=False]: 
+P [align=left, drawing=False]: ACCEPTANCE
+P [align=left, drawing=False]: Please confirm your acceptance of this offer through the VINEXTURE Candidate Portal.
+P [align=left, drawing=False]: Offer Acceptance Deadline: [2 days after acceptance]
+P [align=left, drawing=False]: By accepting this offer, you acknowledge that you have read and understood the internship terms and agree to comply with the applicable requirements and guidelines.
+P [align=left, drawing=False]: We look forward to having you join VINEXTURE and wish you a successful learning experience.
+P [align=left, drawing=False]: 
+P [align=left, drawing=False]: Priya VermaHR Manager
+P [align=left, drawing=False]: VINEXTURETechnology • Digital Solutions • Talent
