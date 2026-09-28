@@ -373,10 +373,18 @@ export default function CandidateDetailPage({
                     <FileText className="h-8 w-8 text-blue-600" />
                     <div>
                       <p className="text-sm font-bold text-slate-900">
-                        {candidate.resume_url || candidate.resume ? "Candidate Resume" : "No Resume Uploaded"}
+                        {candidate.resume_url || candidate.resume
+                          ? (candidate.resume_url?.includes("drive.google.com")
+                              ? "Google Drive Resume"
+                              : "Candidate Resume")
+                          : "No Resume Link"}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {candidate.resume_url || candidate.resume ? "PDF Document" : "Candidate has not attached a resume yet."}
+                        {candidate.resume_url || candidate.resume
+                          ? (candidate.resume_url?.includes("drive.google.com")
+                              ? "Accessible via Google Drive Link"
+                              : "Attached Web Link")
+                          : "Candidate has not attached a resume link yet."}
                       </p>
                     </div>
                   </div>
@@ -385,9 +393,12 @@ export default function CandidateDetailPage({
                       href={candidate.resume_url || candidate.resume || "#"}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition"
                     >
-                      View Resume
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      {candidate.resume_url?.includes("drive.google.com")
+                        ? "Open Google Drive"
+                        : "View Resume"}
                     </a>
                   )}
                 </div>

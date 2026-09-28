@@ -584,19 +584,25 @@ export default function AdminApplicationsPage() {
                   <h3 className="mb-2 font-bold text-slate-900">Documents & Profiles</h3>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div className="sm:col-span-2">
-                      <strong>Resume / CV:</strong>{" "}
-                      {selectedApp.resume_url ? (
-                        <a
-                          href={selectedApp.resume_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 font-semibold text-blue-600 underline"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" /> View Uploaded PDF Resume
-                        </a>
-                      ) : (
-                        <span className="text-slate-400">No PDF uploaded</span>
-                      )}
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span>
+                          <strong>Resume / CV:</strong>{" "}
+                          {!selectedApp.resume_url && <span className="text-slate-400">Not provided</span>}
+                        </span>
+                        {selectedApp.resume_url && (
+                          <a
+                            href={selectedApp.resume_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            {selectedApp.resume_url.includes("drive.google.com")
+                              ? "Open Google Drive Resume"
+                              : "Open Resume Link"}
+                          </a>
+                        )}
+                      </div>
                     </div>
                     {selectedApp.github_url && (
                       <p>

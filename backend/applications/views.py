@@ -48,7 +48,10 @@ def sync_candidate_profile_from_application(user, app):
                     setattr(profile, prof_attr, val)
                     updated = True
 
-        if app.resume and not profile.resume:
+        if getattr(app, 'resume_url', None) and str(app.resume_url).strip():
+            profile.resume_url = str(app.resume_url).strip()
+            updated = True
+        elif app.resume and not profile.resume:
             profile.resume = app.resume
             updated = True
 
@@ -210,10 +213,16 @@ class CandidatePrefillView(APIView):
         certifications = pick('certifications', 'certifications')
 
         resume_url = None
-        if existing_draft and existing_draft.resume:
+        if existing_draft and getattr(existing_draft, 'resume_url', None):
+            resume_url = existing_draft.resume_url
+        elif existing_draft and existing_draft.resume:
             resume_url = request.build_absolute_uri(existing_draft.resume.url)
+        elif getattr(profile, 'resume_url', None):
+            resume_url = profile.resume_url
         elif profile.resume:
             resume_url = request.build_absolute_uri(profile.resume.url)
+        elif latest_app and getattr(latest_app, 'resume_url', None):
+            resume_url = latest_app.resume_url
         elif latest_app and latest_app.resume:
             resume_url = request.build_absolute_uri(latest_app.resume.url)
 

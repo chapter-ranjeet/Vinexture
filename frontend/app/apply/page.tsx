@@ -17,6 +17,7 @@ import {
   FileText,
   GraduationCap,
   HelpCircle,
+  Link2,
   Loader2,
   Lock,
   MapPin,
@@ -369,8 +370,13 @@ function ApplyFormContent() {
         return;
       }
     } else if (currentStep === 4) {
-      if (!formData.resume_url && !resumeFile) {
-        setError("Please upload your Resume / CV in PDF format.");
+      const url = formData.resume_url?.trim() || "";
+      if (!url) {
+        setError("Please provide your Resume / CV link (e.g. Google Drive, Dropbox, or Cloud link).");
+        return;
+      }
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        setError("Please enter a valid URL starting with https:// or http:// (e.g. your Google Drive share link).");
         return;
       }
     }
@@ -951,88 +957,79 @@ function ApplyFormContent() {
                 <span className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600">Step 4 of 7</span>
                 <h2 className="mt-1 text-2xl font-bold text-slate-950">Documents & Profiles</h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Upload your Resume in PDF format and link your online profiles.
+                  Provide your Google Drive (or Cloud) link to your Resume / CV and link your online profiles.
                 </p>
               </div>
 
-              {/* PDF Resume Upload */}
+              {/* Google Drive / Cloud Resume Link */}
               <div className="mb-6">
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Resume / CV (PDF Only, Max 10MB) <span className="text-red-500">*</span>
-                </label>
-                <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-center transition hover:border-slate-400 hover:bg-slate-100/50">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+                    <FileText className="h-4 w-4 text-blue-600" />
+                    Resume / CV Link (Google Drive / Cloud Link) <span className="text-red-500">*</span>
+                  </label>
+                  {formData.resume_url && (
+                    <a
+                      href={formData.resume_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" /> Test / Open Link
+                    </a>
+                  )}
+                </div>
+
+                <div className="relative">
                   <input
-                    type="file"
-                    id="resume-upload"
-                    accept=".pdf,application/pdf"
-                    className="hidden"
+                    type="url"
+                    required
+                    value={formData.resume_url || ""}
                     onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (!file.name.toLowerCase().endsWith(".pdf")) {
-                        setError("Only PDF files are supported for resume upload.");
-                        return;
-                      }
-                      if (file.size > 10 * 1024 * 1024) {
-                        setError("Resume PDF size must be under 10MB.");
-                        return;
-                      }
-                      setResumeFile(file);
-                      setError(null);
+                      const val = e.target.value;
+                      handleFieldChange("resume_url", val);
+                      if (error) setError(null);
                     }}
+                    placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 pl-11 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-sm font-mono text-xs sm:text-sm"
                   />
-                  <div className="flex flex-col items-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                      <Upload className="h-6 w-6" />
+                  <Link2 className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                </div>
+
+                {/* Important Accessibility Advice */}
+                <div className="mt-3 rounded-2xl border border-blue-200 bg-blue-50/80 p-4 text-xs text-blue-950">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-blue-600 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-bold text-blue-900">Make sure your resume link is accessible:</p>
+                      <p className="text-blue-800 leading-relaxed">
+                        1. In Google Drive, right-click your resume file &rarr; click <b>Share</b>.
+                      </p>
+                      <p className="text-blue-800 leading-relaxed">
+                        2. Under <i>General Access</i>, switch from &ldquo;Restricted&rdquo; to <b>&ldquo;Anyone with the link can view&rdquo;</b>.
+                      </p>
+                      <p className="text-blue-800 leading-relaxed">
+                        3. Click <b>Copy link</b> and paste it in the field above.
+                      </p>
                     </div>
-                    {resumeFile ? (
-                      <div className="mt-3">
-                        <p className="text-sm font-semibold text-slate-900">{resumeFile.name}</p>
-                        <p className="text-xs text-slate-500">
-                          {(resumeFile.size / (1024 * 1024)).toFixed(2)} MB • Ready to save
-                        </p>
-                        <label
-                          htmlFor="resume-upload"
-                          className="mt-3 inline-block cursor-pointer text-xs font-semibold text-blue-600 underline"
-                        >
-                          Change PDF file
-                        </label>
-                      </div>
-                    ) : formData.resume_url ? (
-                      <div className="mt-3">
-                        <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
-                          <CheckCircle2 className="h-4 w-4" /> Resume already uploaded
-                        </p>
-                        <div className="mt-2 flex items-center justify-center gap-4">
-                          <a
-                            href={formData.resume_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 underline"
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" /> View current PDF
-                          </a>
-                          <label
-                            htmlFor="resume-upload"
-                            className="cursor-pointer text-xs font-semibold text-slate-600 underline"
-                          >
-                            Replace file
-                          </label>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mt-3">
-                        <label
-                          htmlFor="resume-upload"
-                          className="cursor-pointer text-sm font-semibold text-blue-600 underline hover:text-blue-800"
-                        >
-                          Click to browse and upload Resume
-                        </label>
-                        <p className="mt-1 text-xs text-slate-500">PDF documents only (max 10MB)</p>
-                      </div>
-                    )}
                   </div>
                 </div>
+
+                {formData.resume_url ? (
+                  <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-2 text-xs">
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-700">
+                      <CheckCircle2 className="h-4 w-4" /> Link attached
+                    </span>
+                    <a
+                      href={formData.resume_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      Verify Link Works &rarr;
+                    </a>
+                  </div>
+                ) : null}
               </div>
 
               {/* Profiles */}
@@ -1294,18 +1291,19 @@ function ApplyFormContent() {
                     </button>
                   </div>
                   <div className="grid gap-2 text-sm sm:grid-cols-2">
-                    <p>
-                      <strong className="text-slate-500">Resume:</strong>{" "}
-                      {resumeFile ? (
-                        <span className="font-medium text-emerald-600">{resumeFile.name} (Ready to upload)</span>
-                      ) : formData.resume_url ? (
+                    <p className="sm:col-span-2">
+                      <strong className="text-slate-500">Resume / CV Link:</strong>{" "}
+                      {formData.resume_url ? (
                         <a
                           href={formData.resume_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-medium text-blue-600 underline"
+                          className="inline-flex items-center gap-1 font-semibold text-blue-600 hover:text-blue-800 underline"
                         >
-                          View uploaded PDF
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          {formData.resume_url.includes("drive.google.com")
+                            ? "Open Google Drive Resume"
+                            : "Open Resume Link"}
                         </a>
                       ) : (
                         "—"

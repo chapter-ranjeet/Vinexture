@@ -10,7 +10,7 @@ class CandidateProfileSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(source='user.last_name', required=False)
     name = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
-    resume_url = serializers.SerializerMethodField()
+    resume_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def get_name(self, obj):
         full_name = obj.user.get_full_name()
@@ -25,7 +25,9 @@ class CandidateProfileSerializer(serializers.ModelSerializer):
         return None
 
     def get_resume_url(self, obj):
-        if obj.resume:
+        if getattr(obj, 'resume_url', None) and str(obj.resume_url).strip():
+            return str(obj.resume_url).strip()
+        if getattr(obj, 'resume', None):
             request = self.context.get('request')
             if request:
                 return request.build_absolute_uri(obj.resume.url)
@@ -72,10 +74,11 @@ class CandidateProfileSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'email', 'username', 'created_at', 'updated_at', 'avatar_url', 'resume_url']
+        read_only_fields = ['id', 'email', 'username', 'created_at', 'updated_at', 'avatar_url']
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
+        ret['resume_url'] = self.get_resume_url(instance)
         if not ret.get('phone') and hasattr(instance, 'user') and instance.user.phone:
             ret['phone'] = instance.user.phone
         return ret

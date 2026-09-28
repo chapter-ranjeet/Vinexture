@@ -8,7 +8,7 @@ from .models import Application
 class ApplicationSerializer(serializers.ModelSerializer):
     internship_title = serializers.CharField(source='internship.title', read_only=True)
     internship_data = InternshipSerializer(source='internship', read_only=True)
-    resume_url = serializers.SerializerMethodField()
+    resume_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     latest_payment = serializers.SerializerMethodField()
 
     class Meta:
@@ -70,17 +70,23 @@ class ApplicationSerializer(serializers.ModelSerializer):
             'updated_at',
             'internship_title',
             'internship_data',
-            'resume_url',
             'latest_payment',
         ]
 
     def get_resume_url(self, obj):
-        if obj.resume:
+        if getattr(obj, 'resume_url', None) and str(obj.resume_url).strip():
+            return str(obj.resume_url).strip()
+        if getattr(obj, 'resume', None):
             request = self.context.get('request')
             if request:
                 return request.build_absolute_uri(obj.resume.url)
             return obj.resume.url
         return None
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret['resume_url'] = self.get_resume_url(instance)
+        return ret
 
     def get_latest_payment(self, obj):
         payment = obj.payments.order_by('-created_at').first()

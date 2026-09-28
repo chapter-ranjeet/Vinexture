@@ -30,6 +30,7 @@ class CandidateProfile(models.Model):
     headline = models.CharField(max_length=200, blank=True)
     bio = models.TextField(blank=True)
     resume = models.FileField(upload_to='resumes/', blank=True, null=True)
+    resume_url = models.URLField(max_length=500, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

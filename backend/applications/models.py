@@ -60,6 +60,7 @@ class Application(models.Model):
 
     # 4. Documents
     resume = models.FileField(upload_to='applications/resumes/', blank=True, null=True)
+    resume_url = models.URLField(max_length=500, blank=True, default='')
     github_url = models.URLField(blank=True)
     linkedin_url = models.URLField(blank=True)
     portfolio_url = models.URLField(blank=True)
