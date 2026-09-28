@@ -7,4 +7,4 @@ pip install -r requirements.txt
 
 python manage.py collectstatic --no-input
 python manage.py migrate
-python seed_data.py || true
+python manage.py seed_data || python seed_data.py || true
