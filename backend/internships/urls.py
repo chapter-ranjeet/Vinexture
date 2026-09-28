@@ -4,6 +4,7 @@ from .views import (
     AdminApplicationProjectAssignView,
     AdminInternshipDetailView,
     AdminInternshipListCreateView,
+    AdminPaymentQrListView,
     AdminProjectAssignmentDetailView,
     AdminProjectAssignmentListView,
     AdminProjectDetailView,
@@ -19,7 +20,9 @@ urlpatterns = [
     path('internships/', InternshipListCreateView.as_view(), name='internship-list'),
     path('internships/<slug:slug>/', InternshipDetailView.as_view(), name='internship-detail'),
     path('admin/internships/', AdminInternshipListCreateView.as_view(), name='admin-internship-list'),
+    path('admin/internships/payment-qrs/', AdminPaymentQrListView.as_view(), name='admin-payment-qrs'),
     path('admin/internships/<slug:slug>/', AdminInternshipDetailView.as_view(), name='admin-internship-detail'),
+
 
     # Admin Project Configuration (Up to 5 Projects per Internship)
     path('admin/internships/<int:internship_id>/projects/', AdminProjectListCreateView.as_view(), name='admin-internship-project-list'),

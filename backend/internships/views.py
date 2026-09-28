@@ -84,6 +84,52 @@ class AdminInternshipDetailView(generics.RetrieveUpdateDestroyAPIView):
         return get_object_or_404(Internship, slug=lookup)
 
 
+class AdminPaymentQrListView(APIView):
+    """Staff endpoint to list unique payment QR codes previously uploaded across internships."""
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        india_qrs = []
+        nepal_qrs = []
+        seen_india = set()
+        seen_nepal = set()
+
+        internships = Internship.objects.all().order_by('-updated_at')
+        for item in internships:
+            if item.india_payment_qr and item.india_payment_qr.name and item.india_payment_qr.name not in seen_india:
+                seen_india.add(item.india_payment_qr.name)
+                try:
+                    url = request.build_absolute_uri(item.india_payment_qr.url) if request else item.india_payment_qr.url
+                except Exception:
+                    url = str(item.india_payment_qr)
+                india_qrs.append({
+                    'internship_id': item.id,
+                    'internship_title': item.title,
+                    'file_name': item.india_payment_qr.name,
+                    'url': url,
+                    'updated_at': item.updated_at.isoformat() if item.updated_at else None,
+                })
+            if item.nepal_payment_qr and item.nepal_payment_qr.name and item.nepal_payment_qr.name not in seen_nepal:
+                seen_nepal.add(item.nepal_payment_qr.name)
+                try:
+                    url = request.build_absolute_uri(item.nepal_payment_qr.url) if request else item.nepal_payment_qr.url
+                except Exception:
+                    url = str(item.nepal_payment_qr)
+                nepal_qrs.append({
+                    'internship_id': item.id,
+                    'internship_title': item.title,
+                    'file_name': item.nepal_payment_qr.name,
+                    'url': url,
+                    'updated_at': item.updated_at.isoformat() if item.updated_at else None,
+                })
+
+        return Response({
+            'india_qrs': india_qrs,
+            'nepal_qrs': nepal_qrs,
+        })
+
+
+
 # -------------------------------------------------------------
 # Admin Projects Configuration (Up to 5 Projects per Internship)
 # -------------------------------------------------------------

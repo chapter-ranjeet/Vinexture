@@ -118,9 +118,23 @@ class InternshipSerializer(serializers.ModelSerializer):
 class AdminInternshipSerializer(InternshipSerializer):
     """Staff serializer; includes nested configured projects for easy authoring."""
     projects = ProjectSerializer(many=True, read_only=True)
+    copy_india_qr_from = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
+    copy_nepal_qr_from = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
+    reuse_india_qr = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
+    reuse_nepal_qr = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
+    clear_india_qr = serializers.BooleanField(write_only=True, required=False, default=False)
+    clear_nepal_qr = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta(InternshipSerializer.Meta):
-        fields = InternshipSerializer.Meta.fields + ['projects']
+        fields = InternshipSerializer.Meta.fields + [
+            'projects',
+            'copy_india_qr_from',
+            'copy_nepal_qr_from',
+            'reuse_india_qr',
+            'reuse_nepal_qr',
+            'clear_india_qr',
+            'clear_nepal_qr',
+        ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'is_open', 'projects']
 
     def validate_available_seats(self, value):
@@ -149,6 +163,74 @@ class AdminInternshipSerializer(InternshipSerializer):
             if hasattr(value, 'size') and value.size > 5 * 1024 * 1024:
                 raise serializers.ValidationError('Nepal QR image size must be under 5MB.')
         return value
+
+    def _apply_qr_reuse(self, instance, copy_data):
+        copy_india = copy_data.get('copy_india_qr_from')
+        copy_nepal = copy_data.get('copy_nepal_qr_from')
+        reuse_india = copy_data.get('reuse_india_qr')
+        reuse_nepal = copy_data.get('reuse_nepal_qr')
+        clear_india = copy_data.get('clear_india_qr', False)
+        clear_nepal = copy_data.get('clear_nepal_qr', False)
+
+        if clear_india:
+            instance.india_payment_qr = None
+        elif not instance.india_payment_qr or copy_india or reuse_india:
+            if copy_india:
+                if str(copy_india).isdigit():
+                    src = Internship.objects.filter(id=int(copy_india)).first()
+                    if src and src.india_payment_qr:
+                        instance.india_payment_qr.name = src.india_payment_qr.name
+                else:
+                    instance.india_payment_qr.name = str(copy_india)
+            elif reuse_india:
+                instance.india_payment_qr.name = str(reuse_india)
+
+        if clear_nepal:
+            instance.nepal_payment_qr = None
+        elif not instance.nepal_payment_qr or copy_nepal or reuse_nepal:
+            if copy_nepal:
+                if str(copy_nepal).isdigit():
+                    src = Internship.objects.filter(id=int(copy_nepal)).first()
+                    if src and src.nepal_payment_qr:
+                        instance.nepal_payment_qr.name = src.nepal_payment_qr.name
+                else:
+                    instance.nepal_payment_qr.name = str(copy_nepal)
+            elif reuse_nepal:
+                instance.nepal_payment_qr.name = str(reuse_nepal)
+
+    def create(self, validated_data):
+        copy_data = {
+            'copy_india_qr_from': validated_data.pop('copy_india_qr_from', None),
+            'copy_nepal_qr_from': validated_data.pop('copy_nepal_qr_from', None),
+            'reuse_india_qr': validated_data.pop('reuse_india_qr', None),
+            'reuse_nepal_qr': validated_data.pop('reuse_nepal_qr', None),
+            'clear_india_qr': validated_data.pop('clear_india_qr', False),
+            'clear_nepal_qr': validated_data.pop('clear_nepal_qr', False),
+        }
+        instance = super().create(validated_data)
+        self._apply_qr_reuse(instance, copy_data)
+        instance.save()
+        return instance
+
+    def update(self, instance, validated_data):
+        copy_data = {
+            'copy_india_qr_from': validated_data.pop('copy_india_qr_from', None),
+            'copy_nepal_qr_from': validated_data.pop('copy_nepal_qr_from', None),
+            'reuse_india_qr': validated_data.pop('reuse_india_qr', None),
+            'reuse_nepal_qr': validated_data.pop('reuse_nepal_qr', None),
+            'clear_india_qr': validated_data.pop('clear_india_qr', False),
+            'clear_nepal_qr': validated_data.pop('clear_nepal_qr', False),
+        }
+        has_new_india_file = 'india_payment_qr' in validated_data
+        has_new_nepal_file = 'nepal_payment_qr' in validated_data
+
+        instance = super().update(instance, validated_data)
+
+        if not has_new_india_file or not has_new_nepal_file:
+            self._apply_qr_reuse(instance, copy_data)
+            instance.save()
+        return instance
+
 
 
 class ProjectAssignmentSerializer(serializers.ModelSerializer):

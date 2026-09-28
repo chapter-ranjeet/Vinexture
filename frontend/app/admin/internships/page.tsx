@@ -41,6 +41,14 @@ type ProjectConfig = {
   default_days: number;
 };
 
+type PreviousQrItem = {
+  internship_id: number;
+  internship_title: string;
+  file_name: string;
+  url: string;
+  updated_at?: string;
+};
+
 type Internship = {
   id: number;
   title: string;
@@ -119,6 +127,19 @@ export default function AdminInternshipsPage() {
   const [currentIndiaQrUrl, setCurrentIndiaQrUrl] = useState<string | null>(null);
   const [currentNepalQrUrl, setCurrentNepalQrUrl] = useState<string | null>(null);
 
+  // Previous QR Library
+  const [previousIndiaQrs, setPreviousIndiaQrs] = useState<PreviousQrItem[]>([]);
+  const [previousNepalQrs, setPreviousNepalQrs] = useState<PreviousQrItem[]>([]);
+  const [selectedPreviousIndiaQr, setSelectedPreviousIndiaQr] = useState<PreviousQrItem | null>(null);
+  const [selectedPreviousNepalQr, setSelectedPreviousNepalQr] = useState<PreviousQrItem | null>(null);
+  const [clearIndiaQr, setClearIndiaQr] = useState(false);
+  const [clearNepalQr, setClearNepalQr] = useState(false);
+
+  // Deletion modals & states
+  const [deleteModalTarget, setDeleteModalTarget] = useState<Internship | null>(null);
+  const [deletingInternship, setDeletingInternship] = useState(false);
+  const [deletingProjectId, setDeletingProjectId] = useState<number | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -135,9 +156,25 @@ export default function AdminInternshipsPage() {
     }
   }
 
+  async function loadPreviousQrs() {
+    try {
+      const res = await fetchJson<{ india_qrs?: PreviousQrItem[]; nepal_qrs?: PreviousQrItem[] }>(
+        "/admin/internships/payment-qrs/"
+      );
+      if (res) {
+        setPreviousIndiaQrs(res.india_qrs || []);
+        setPreviousNepalQrs(res.nepal_qrs || []);
+      }
+    } catch {
+      // Non-critical background load
+    }
+  }
+
   useEffect(() => {
     void loadInternships();
+    void loadPreviousQrs();
   }, []);
+
 
   function resetForm() {
     setEditingId(null);
@@ -164,6 +201,10 @@ export default function AdminInternshipsPage() {
     setNepalQrFile(null);
     setCurrentIndiaQrUrl(null);
     setCurrentNepalQrUrl(null);
+    setSelectedPreviousIndiaQr(null);
+    setSelectedPreviousNepalQr(null);
+    setClearIndiaQr(false);
+    setClearNepalQr(false);
   }
 
   async function startEdit(internship: Internship) {
@@ -197,6 +238,10 @@ export default function AdminInternshipsPage() {
     setCurrentNepalQrUrl(internship.nepal_payment_qr_url);
     setIndiaQrFile(null);
     setNepalQrFile(null);
+    setSelectedPreviousIndiaQr(null);
+    setSelectedPreviousNepalQr(null);
+    setClearIndiaQr(false);
+    setClearNepalQr(false);
 
     // Fetch existing projects for this internship
     try {
@@ -242,6 +287,32 @@ export default function AdminInternshipsPage() {
     setProjects(reindexed);
   }
 
+  async function handleDeleteProject(index: number) {
+    const proj = projects[index];
+    if (projects.length <= 1) {
+      setError("An internship requires at least 1 milestone project.");
+      return;
+    }
+
+    if (proj.id) {
+      const ok = window.confirm(`Permanently delete Project #${proj.order}: "${proj.title}"?`);
+      if (!ok) return;
+
+      try {
+        setDeletingProjectId(proj.id);
+        await fetchJson(`/admin/projects/${proj.id}/`, { method: "DELETE" });
+        setMessage(`Project "${proj.title}" deleted.`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to delete project.");
+        return;
+      } finally {
+        setDeletingProjectId(null);
+      }
+    }
+
+    removeProject(index);
+  }
+
   function updateProjectField(index: number, field: keyof ProjectConfig, value: string | number) {
     const updated = [...projects];
     updated[index] = { ...updated[index], [field]: value };
@@ -276,11 +347,24 @@ export default function AdminInternshipsPage() {
       formData.append("currency", currency);
       formData.append("payment_instructions", paymentInstructions.trim());
 
+      // India QR handling
       if (indiaQrFile) {
         formData.append("india_payment_qr", indiaQrFile);
+      } else if (selectedPreviousIndiaQr) {
+        formData.append("copy_india_qr_from", String(selectedPreviousIndiaQr.internship_id));
+        formData.append("reuse_india_qr", selectedPreviousIndiaQr.file_name);
+      } else if (clearIndiaQr) {
+        formData.append("clear_india_qr", "true");
       }
+
+      // Nepal QR handling
       if (nepalQrFile) {
         formData.append("nepal_payment_qr", nepalQrFile);
+      } else if (selectedPreviousNepalQr) {
+        formData.append("copy_nepal_qr_from", String(selectedPreviousNepalQr.internship_id));
+        formData.append("reuse_nepal_qr", selectedPreviousNepalQr.file_name);
+      } else if (clearNepalQr) {
+        formData.append("clear_nepal_qr", "true");
       }
 
       let savedInternship: Internship;
@@ -320,12 +404,32 @@ export default function AdminInternshipsPage() {
       );
       resetForm();
       await loadInternships();
+      await loadPreviousQrs();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Failed to save internship.");
     } finally {
       setSaving(false);
     }
   }
+
+  async function executeDeleteInternship(internship: Internship) {
+    try {
+      setDeletingInternship(true);
+      await fetchJson(`/admin/internships/${internship.id}/`, { method: "DELETE" });
+      setMessage(`Internship "${internship.title}" and its configured curriculum were deleted successfully.`);
+      setDeleteModalTarget(null);
+      if (editingId === internship.id) {
+        resetForm();
+      }
+      await loadInternships();
+      await loadPreviousQrs();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete internship.");
+    } finally {
+      setDeletingInternship(false);
+    }
+  }
+
 
   async function quickSetStatus(internship: Internship, newStatus: "published" | "closed" | "draft") {
     try {
@@ -590,12 +694,19 @@ export default function AdminInternshipsPage() {
                       {projects.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => removeProject(idx)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-800"
+                          disabled={deletingProjectId === proj.id}
+                          onClick={() => void handleDeleteProject(idx)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/70 px-2.5 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-100 hover:text-red-800 disabled:opacity-50"
                         >
-                          <Trash2 className="h-3.5 w-3.5" /> Remove
+                          {deletingProjectId === proj.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" />
+                          )}
+                          Delete Project
                         </button>
                       )}
+
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -714,22 +825,58 @@ export default function AdminInternshipsPage() {
                 </div>
               </div>
 
-              {/* QR Upload Cards */}
-              <div className="mt-4 grid gap-6 sm:grid-cols-2">
+              {/* QR Upload & Previous QR Library Cards */}
+              <div className="mt-4 grid gap-6 lg:grid-cols-2">
                 {/* India UPI QR */}
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                    India Payment QR (UPI QR Image)
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">
-                    Displayed dynamically to Indian applicants (₹{applicationFee}).
-                  </p>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                        India Payment QR (UPI QR Image)
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        Displayed dynamically to Indian applicants (₹{applicationFee}).
+                      </p>
+                    </div>
+                    {(currentIndiaQrUrl || indiaQrFile || selectedPreviousIndiaQr) && !clearIndiaQr ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setClearIndiaQr(true);
+                          setIndiaQrFile(null);
+                          setSelectedPreviousIndiaQr(null);
+                        }}
+                        className="text-[11px] font-semibold text-red-600 hover:text-red-800"
+                      >
+                        Remove QR
+                      </button>
+                    ) : clearIndiaQr ? (
+                      <button
+                        type="button"
+                        onClick={() => setClearIndiaQr(false)}
+                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-800"
+                      >
+                        Undo Remove
+                      </button>
+                    ) : null}
+                  </div>
 
                   <div className="mt-3 flex items-center gap-4">
-                    {indiaQrFile ? (
-                      <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-blue-50 text-xs font-bold text-blue-700">
-                        New file
+                    {clearIndiaQr ? (
+                      <div className="flex h-20 w-20 flex-col items-center justify-center rounded-xl border border-dashed border-red-300 bg-red-50 text-[10px] font-bold text-red-700 text-center p-1">
+                        Removed
                       </div>
+                    ) : indiaQrFile ? (
+                      <div className="flex h-20 w-20 flex-col items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-[10px] font-bold text-blue-700 text-center p-1">
+                        New File
+                      </div>
+                    ) : selectedPreviousIndiaQr ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={selectedPreviousIndiaQr.url}
+                        alt="Selected India QR"
+                        className="h-20 w-20 rounded-xl border-2 border-emerald-500 object-contain bg-white p-1"
+                      />
                     ) : currentIndiaQrUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -751,7 +898,11 @@ export default function AdminInternshipsPage() {
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file) setIndiaQrFile(file);
+                          if (file) {
+                            setIndiaQrFile(file);
+                            setSelectedPreviousIndiaQr(null);
+                            setClearIndiaQr(false);
+                          }
                         }}
                       />
                       <label
@@ -759,29 +910,118 @@ export default function AdminInternshipsPage() {
                         className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                       >
                         <Upload className="h-3.5 w-3.5" />
-                        {currentIndiaQrUrl ? "Replace UPI QR" : "Upload UPI QR"}
+                        {currentIndiaQrUrl || selectedPreviousIndiaQr ? "Upload New Image" : "Upload UPI QR"}
                       </label>
                       {indiaQrFile && (
                         <p className="mt-1 text-xs font-medium text-emerald-600">{indiaQrFile.name}</p>
                       )}
+                      {selectedPreviousIndiaQr && !indiaQrFile && (
+                        <p className="mt-1 text-xs font-medium text-emerald-600">
+                          Reusing from: {selectedPreviousIndiaQr.internship_title}
+                        </p>
+                      )}
                     </div>
                   </div>
+
+                  {/* Previous India QRs Library */}
+                  {previousIndiaQrs.length > 0 && (
+                    <div className="mt-4 border-t border-slate-200/80 pt-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Select from Previously Uploaded India QRs ({previousIndiaQrs.length}):
+                      </p>
+                      <div className="mt-2 flex gap-2.5 overflow-x-auto pb-1">
+                        {previousIndiaQrs.map((qr) => {
+                          const isSelected =
+                            selectedPreviousIndiaQr?.file_name === qr.file_name ||
+                            (!selectedPreviousIndiaQr && !indiaQrFile && currentIndiaQrUrl === qr.url);
+
+                          return (
+                            <button
+                              key={qr.file_name}
+                              type="button"
+                              onClick={() => {
+                                setSelectedPreviousIndiaQr(qr);
+                                setIndiaQrFile(null);
+                                setClearIndiaQr(false);
+                              }}
+                              className={`flex shrink-0 items-center gap-2 rounded-xl border p-2 text-left transition ${
+                                isSelected
+                                  ? "border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/20"
+                                  : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                              }`}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={qr.url}
+                                alt={qr.internship_title}
+                                className="h-10 w-10 rounded-lg border border-slate-100 object-contain bg-white p-0.5"
+                              />
+                              <div className="max-w-[130px]">
+                                <p className="truncate text-xs font-bold text-slate-800">
+                                  {qr.internship_title}
+                                </p>
+                                <span className={`inline-block text-[10px] font-semibold ${isSelected ? "text-emerald-700" : "text-blue-600"}`}>
+                                  {isSelected ? "✓ Selected" : "Click to use"}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Nepal eSewa QR */}
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                    Nepal Payment QR (eSewa QR Image)
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-slate-500">
-                    Displayed dynamically to Nepali applicants (NPR {nepalApplicationFee}).
-                  </p>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                        Nepal Payment QR (eSewa QR Image)
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        Displayed dynamically to Nepali applicants (NPR {nepalApplicationFee}).
+                      </p>
+                    </div>
+                    {(currentNepalQrUrl || nepalQrFile || selectedPreviousNepalQr) && !clearNepalQr ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setClearNepalQr(true);
+                          setNepalQrFile(null);
+                          setSelectedPreviousNepalQr(null);
+                        }}
+                        className="text-[11px] font-semibold text-red-600 hover:text-red-800"
+                      >
+                        Remove QR
+                      </button>
+                    ) : clearNepalQr ? (
+                      <button
+                        type="button"
+                        onClick={() => setClearNepalQr(false)}
+                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-800"
+                      >
+                        Undo Remove
+                      </button>
+                    ) : null}
+                  </div>
 
                   <div className="mt-3 flex items-center gap-4">
-                    {nepalQrFile ? (
-                      <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-emerald-50 text-xs font-bold text-emerald-700">
-                        New file
+                    {clearNepalQr ? (
+                      <div className="flex h-20 w-20 flex-col items-center justify-center rounded-xl border border-dashed border-red-300 bg-red-50 text-[10px] font-bold text-red-700 text-center p-1">
+                        Removed
                       </div>
+                    ) : nepalQrFile ? (
+                      <div className="flex h-20 w-20 flex-col items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-[10px] font-bold text-emerald-700 text-center p-1">
+                        New File
+                      </div>
+                    ) : selectedPreviousNepalQr ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={selectedPreviousNepalQr.url}
+                        alt="Selected Nepal QR"
+                        className="h-20 w-20 rounded-xl border-2 border-emerald-500 object-contain bg-white p-1"
+                      />
                     ) : currentNepalQrUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -803,7 +1043,11 @@ export default function AdminInternshipsPage() {
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file) setNepalQrFile(file);
+                          if (file) {
+                            setNepalQrFile(file);
+                            setSelectedPreviousNepalQr(null);
+                            setClearNepalQr(false);
+                          }
                         }}
                       />
                       <label
@@ -811,36 +1055,108 @@ export default function AdminInternshipsPage() {
                         className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                       >
                         <Upload className="h-3.5 w-3.5" />
-                        {currentNepalQrUrl ? "Replace eSewa QR" : "Upload eSewa QR"}
+                        {currentNepalQrUrl || selectedPreviousNepalQr ? "Upload New Image" : "Upload eSewa QR"}
                       </label>
                       {nepalQrFile && (
                         <p className="mt-1 text-xs font-medium text-emerald-600">{nepalQrFile.name}</p>
                       )}
+                      {selectedPreviousNepalQr && !nepalQrFile && (
+                        <p className="mt-1 text-xs font-medium text-emerald-600">
+                          Reusing from: {selectedPreviousNepalQr.internship_title}
+                        </p>
+                      )}
                     </div>
                   </div>
+
+                  {/* Previous Nepal QRs Library */}
+                  {previousNepalQrs.length > 0 && (
+                    <div className="mt-4 border-t border-slate-200/80 pt-3">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        Select from Previously Uploaded Nepal QRs ({previousNepalQrs.length}):
+                      </p>
+                      <div className="mt-2 flex gap-2.5 overflow-x-auto pb-1">
+                        {previousNepalQrs.map((qr) => {
+                          const isSelected =
+                            selectedPreviousNepalQr?.file_name === qr.file_name ||
+                            (!selectedPreviousNepalQr && !nepalQrFile && currentNepalQrUrl === qr.url);
+
+                          return (
+                            <button
+                              key={qr.file_name}
+                              type="button"
+                              onClick={() => {
+                                setSelectedPreviousNepalQr(qr);
+                                setNepalQrFile(null);
+                                setClearNepalQr(false);
+                              }}
+                              className={`flex shrink-0 items-center gap-2 rounded-xl border p-2 text-left transition ${
+                                isSelected
+                                  ? "border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/20"
+                                  : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                              }`}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={qr.url}
+                                alt={qr.internship_title}
+                                className="h-10 w-10 rounded-lg border border-slate-100 object-contain bg-white p-0.5"
+                              />
+                              <div className="max-w-[130px]">
+                                <p className="truncate text-xs font-bold text-slate-800">
+                                  {qr.internship_title}
+                                </p>
+                                <span className={`inline-block text-[10px] font-semibold ${isSelected ? "text-emerald-700" : "text-emerald-600"}`}>
+                                  {isSelected ? "✓ Selected" : "Click to use"}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Actions */}
-            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-6">
-              {editingId && (
-                <Button type="button" variant="secondary" onClick={resetForm}>
-                  Cancel
-                </Button>
-              )}
-              <Button type="submit" disabled={saving} className="gap-2 px-6">
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Saving...
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-4 w-4" /> {editingId ? "Update Internship & Curriculum" : "Publish Internship & Curriculum"}
-                  </>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-6">
+              <div>
+                {editingId && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => {
+                      const cur = internships.find((i) => i.id === editingId);
+                      if (cur) setDeleteModalTarget(cur);
+                    }}
+                    className="gap-2 text-xs"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete This Internship
+                  </Button>
                 )}
-              </Button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {editingId && (
+                  <Button type="button" variant="secondary" onClick={resetForm}>
+                    Cancel
+                  </Button>
+                )}
+                <Button type="submit" disabled={saving} className="gap-2 px-6">
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" /> {editingId ? "Update Internship & Curriculum" : "Publish Internship & Curriculum"}
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
+
           </div>
         </form>
 
@@ -959,6 +1275,15 @@ export default function AdminInternshipsPage() {
                             >
                               <Eye className="h-3.5 w-3.5" /> Preview
                             </Link>
+
+                            <button
+                              type="button"
+                              onClick={() => setDeleteModalTarget(internship)}
+                              className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50/50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100 hover:text-red-800 transition"
+                              title="Delete Internship"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -969,7 +1294,54 @@ export default function AdminInternshipsPage() {
             </div>
           )}
         </section>
+
+        {/* DELETE CONFIRMATION MODAL */}
+        {deleteModalTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-xl">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600 mb-4">
+                <Trash2 className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Delete Internship Cohort?</h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Are you sure you want to delete{" "}
+                <strong className="text-slate-800">{deleteModalTarget.title}</strong>? This will permanently
+                remove this internship, its configured milestone projects, and any associated curriculum data. This
+                action cannot be undone.
+              </p>
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={deletingInternship}
+                  onClick={() => setDeleteModalTarget(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={deletingInternship}
+                  onClick={() => void executeDeleteInternship(deleteModalTarget)}
+                  className="gap-2"
+                >
+                  {deletingInternship ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4" /> Yes, Delete Permanently
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </AdminShell>
   );
 }
+

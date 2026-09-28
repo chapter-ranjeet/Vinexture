@@ -11,8 +11,9 @@ import { ProtectedRoute } from "@/components/protected-route";
 
 const navigation = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/cms", label: "CMS", icon: Newspaper },
+  { href: "/admin/cms", label: "CMS & Content", icon: Newspaper },
   { href: "/admin/candidates", label: "Candidates", icon: Users },
+
   { href: "/admin/internships", label: "Internships", icon: BriefcaseBusiness },
   { href: "/admin/applications", label: "Applications", icon: ClipboardList },
   { href: "/admin/projects", label: "Assigned Projects", icon: FolderGit2 },

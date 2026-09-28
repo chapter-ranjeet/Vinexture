@@ -81,3 +81,39 @@ body {
   border: 1px solid var(--border);
   box-shadow: var(--shadow-soft);
 }
+
+/* Button micro-interactions and tactile page transition feedback */
+button {
+  transition: transform 0.14s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s ease, background-color 0.15s ease, opacity 0.15s ease;
+}
+
+button:active,
+.btn-pressed-active {
+  transform: scale(0.96) !important;
+}
+
+button[data-submitting="true"] {
+  position: relative;
+  opacity: 0.88;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+button[data-submitting="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: button-processing-shimmer 1.1s infinite;
+}
+
+@keyframes button-processing-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
