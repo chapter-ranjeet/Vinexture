@@ -1,18 +1,28 @@
 services:
   - type: web
-    name: vinexture-api
+    name: vinexture-backend
     runtime: python
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
+    buildCommand: "bash ./build.sh"
+    startCommand: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT"
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: DJANGO_SECRET_KEY
         generateValue: true
       - key: DJANGO_DEBUG
         value: "False"
       - key: DJANGO_ALLOWED_HOSTS
         value: "*"
-      - key: FRONTEND_URL
-        value: "https://your-frontend-domain.vercel.app"
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: vinexture-db
+          property: connectionString
+      - key: FRONTEND_URL
+        value: "https://vinexture.vercel.app"
+
+databases:
+  - name: vinexture-db
+    databaseName: vinexture
+    user: vinexture_user
+    plan: free

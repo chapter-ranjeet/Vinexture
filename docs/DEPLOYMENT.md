@@ -1,31 +1,77 @@
-# Deployment Guide
+# VINEXTURE Live Deployment Guide (Render + Vercel)
 
-## Frontend (Vercel)
+This repository is pre-configured for deployment with **Render** (Django REST API + PostgreSQL) and **Vercel** (Next.js 16 + TypeScript Frontend).
 
-1. Import the `frontend/` directory into Vercel.
-2. Set environment variables, for example:
-   - `NEXT_PUBLIC_API_URL=https://your-backend-url/api`
-3. Deploy the app.
+---
 
-## Backend (Render or Railway)
+## 🚀 Part 1: Deploy Backend on Render
 
-1. Create a new web service from the `backend/` directory.
-2. Use a PostgreSQL add-on for production data.
-3. Configure environment variables:
-   - `DJANGO_SECRET_KEY=replace-with-secure-secret`
-   - `DJANGO_DEBUG=False`
-   - `DJANGO_ALLOWED_HOSTS=your-backend-domain.onrender.com,localhost`
-   - `FRONTEND_URL=https://your-frontend-domain.vercel.app`
-   - `DATABASE_URL=postgres://user:password@host:5432/dbname`
-4. Run database migrations and collect static files.
-5. Set the application to run with `gunicorn config.wsgi` or the platform default web server.
+### Method A: Blueprint (Recommended - 1 Click)
+1. Go to **[dashboard.render.com](https://dashboard.render.com/)**.
+2. Click **New +** &rarr; **Blueprint**.
+3. Connect your GitHub repository: `https://github.com/chapter-ranjeet/Vinexture`.
+4. Render will detect [`render.yaml`](../render.yaml) automatically:
+   - **Web Service**: `vinexture-backend` (Python 3.11 with Gunicorn & WhiteNoise)
+   - **Database**: `vinexture-db` (Free PostgreSQL instance)
+   - **Build Command**: `bash ./build.sh` (collects static files, runs migrations, seeds initial data)
+   - **Start Command**: `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT`
+5. Click **Apply**.
+6. Once deployed, copy your Render backend URL (e.g. `https://vinexture-backend.onrender.com`).
 
-## Production database
+### Method B: Manual Web Service
+If creating manually:
+1. Click **New +** &rarr; **PostgreSQL**:
+   - Name: `vinexture-db` &bull; Click **Create Database**.
+   - Copy the **Internal Database URL**.
+2. Click **New +** &rarr; **Web Service**:
+   - Connect repository: `https://github.com/chapter-ranjeet/Vinexture`.
+   - **Root Directory**: `backend`
+   - **Runtime**: `Python 3`
+   - **Build Command**: `bash ./build.sh`
+   - **Start Command**: `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT`
+3. Add **Environment Variables**:
+   - `PYTHON_VERSION`: `3.11.9`
+   - `DJANGO_SECRET_KEY`: (Click generate)
+   - `DJANGO_DEBUG`: `False`
+   - `DJANGO_ALLOWED_HOSTS`: `*`
+   - `DATABASE_URL`: (Paste database connection string)
+   - `FRONTEND_URL`: `https://your-app-name.vercel.app`
 
-Use PostgreSQL for production. The project is structured to transition from SQLite in development to PostgreSQL deployment without changing the app architecture significantly.
+---
 
-## Notes
+## ⚡ Part 2: Deploy Frontend on Vercel
 
-- Keep local development on SQLite to keep bootstrapping simple.
-- For Render or Railway, use the provided Postgres add-on and set `DATABASE_URL` to the service connection string.
-- Configure CORS and `FRONTEND_URL` for the deployed frontend origin to enable JWT-based API access.
+1. Go to **[vercel.com/new](https://vercel.com/new)**.
+2. Select and import `chapter-ranjeet/Vinexture`.
+3. In **Project Settings**:
+   - **Framework Preset**: `Next.js`
+   - **Root Directory**: `frontend` *(already pre-configured in `vercel.json`)*
+4. Under **Environment Variables**, add:
+   - **Key**: `NEXT_PUBLIC_API_URL`
+   - **Value**: `https://<YOUR-RENDER-BACKEND-URL>/api` (e.g. `https://vinexture-backend.onrender.com/api`)
+5. Click **Deploy**.
+6. Vercel will build and assign your production domain (e.g. `https://vinexture.vercel.app`).
+
+---
+
+## 🔗 Part 3: Connect Frontend & Backend
+
+1. In your **Render Dashboard** &rarr; `vinexture-backend` &rarr; **Environment**:
+   - Update `FRONTEND_URL` to your production Vercel domain (e.g. `https://vinexture.vercel.app`).
+   - Save changes (Render will automatically redeploy with CORS permissions).
+2. Create an admin user on Render:
+   - In Render Web Service &rarr; Click **Shell** tab &rarr; Run:
+     ```bash
+     python manage.py createsuperuser
+     ```
+   - Follow prompts to set email and password.
+
+---
+
+## ✅ Live Testing Checklist
+
+- [ ] Visit frontend at `https://<YOUR-APP>.vercel.app` &bull; check homepage and cohort listings.
+- [ ] Log in with your admin user at `/login` &bull; verify access to `/admin` and `/admin/offers`.
+- [ ] Test candidate application submission &bull; verify payment proof upload.
+- [ ] Test Offer Letter generation for accepted candidates &bull; verify single-page A4 PDF download.
+- [ ] Scan dynamic QR code &bull; verify `/offers/verify/<verification_code>` page loads and confirms authenticity.
